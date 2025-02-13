@@ -278,6 +278,7 @@ extern const safety_hooks nissan_hooks;
 extern const safety_hooks subaru_hooks;
 extern const safety_hooks subaru_preglobal_hooks;
 extern const safety_hooks tesla_hooks;
+extern const safety_hooks ava_hooks;
 extern const safety_hooks toyota_hooks;
 extern const safety_hooks volkswagen_mqb_hooks;
 extern const safety_hooks volkswagen_pq_hooks;
