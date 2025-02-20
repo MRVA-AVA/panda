@@ -2,72 +2,50 @@
 
 #include "safety_declarations.h"
 
-void default_rx_hook(const CANPacket_t *to_push) {
-  UNUSED(to_push);
+static void ava_rx_hook(const CANPacket_t *to_push) {
+  (void)to_push;
+  return;
 }
 
-// *** no output safety mode ***
 
-static safety_config nooutput_init(uint16_t param) {
-  UNUSED(param);
-  return (safety_config){NULL, 0, NULL, 0};
+static bool ava_tx_hook(const CANPacket_t *to_send) {
+  (void)to_send;
+  bool tx = true;
+  return tx;
 }
 
-static bool nooutput_tx_hook(const CANPacket_t *to_send) {
-  UNUSED(to_send);
-  return false;
-}
-
-static int default_fwd_hook(int bus_num, int addr) {
-  UNUSED(bus_num);
-  UNUSED(addr);
-  return -1;
-}
-
-const safety_hooks nooutput_hooks = {
-  .init = nooutput_init,
-  .rx = default_rx_hook,
-  .tx = nooutput_tx_hook,
-  .fwd = default_fwd_hook,
-};
-
-// *** all output safety mode ***
-
-// Enables passthrough mode where relay is open and bus 0 gets forwarded to bus 2 and vice versa
-static bool alloutput_passthrough = false;
-
-static safety_config alloutput_init(uint16_t param) {
-  // Enables passthrough mode where relay is open and bus 0 gets forwarded to bus 2 and vice versa
-  const uint16_t ALLOUTPUT_PARAM_PASSTHROUGH = 1;
-  controls_allowed = true;
-  alloutput_passthrough = GET_FLAG(param, ALLOUTPUT_PARAM_PASSTHROUGH);
-  return (safety_config){NULL, 0, NULL, 0};
-}
-
-static bool alloutput_tx_hook(const CANPacket_t *to_send) {
-  UNUSED(to_send);
-  return true;
-}
-
-static int alloutput_fwd_hook(int bus_num, int addr) {
+static int ava_fwd_hook(int bus_num, int addr) {
+  (void)bus_num;
+  (void)addr;
   int bus_fwd = -1;
-  UNUSED(addr);
-
-  if (alloutput_passthrough) {
-    if (bus_num == 0) {
-      bus_fwd = 2;
-    }
-    if (bus_num == 2) {
-      bus_fwd = 0;
-    }
-  }
-
   return bus_fwd;
 }
 
-const safety_hooks alloutput_hooks = {
-  .init = alloutput_init,
-  .rx = default_rx_hook,
-  .tx = alloutput_tx_hook,
-  .fwd = alloutput_fwd_hook,
+static safety_config ava_init(uint16_t param) {
+  (void)param;
+  safety_config ret;
+  static const CanMsg TESLA_TX_MSGS[] = {
+    {0x488, 0, 4},  // DAS_steeringControl
+    {0x45, 0, 8},   // STW_ACTN_RQ
+    {0x45, 2, 8},   // STW_ACTN_RQ
+    {0x2b9, 0, 8},  // DAS_control
+  };
+  static RxCheck tesla_rx_checks[] = {
+    {.msg = {{0x2b9, 2, 8, .frequency = 25U}, { 0 }, { 0 }}},   // DAS_control
+    {.msg = {{0x370, 0, 8, .frequency = 25U}, { 0 }, { 0 }}},   // EPAS_sysStatus
+    {.msg = {{0x108, 0, 8, .frequency = 100U}, { 0 }, { 0 }}},  // DI_torque1
+    {.msg = {{0x118, 0, 6, .frequency = 100U}, { 0 }, { 0 }}},  // DI_torque2
+    {.msg = {{0x20a, 0, 8, .frequency = 50U}, { 0 }, { 0 }}},   // BrakeMessage
+    {.msg = {{0x368, 0, 8, .frequency = 10U}, { 0 }, { 0 }}},   // DI_state
+    {.msg = {{0x318, 0, 8, .frequency = 10U}, { 0 }, { 0 }}},   // GTW_carState
+  };
+  ret = BUILD_SAFETY_CFG(tesla_rx_checks, TESLA_TX_MSGS);
+  return ret;
+}
+
+const safety_hooks ava_hooks = {
+  .init = ava_init,
+  .rx = ava_rx_hook,
+  .tx = ava_tx_hook,
+  .fwd = ava_fwd_hook,
 };
